@@ -1,13 +1,14 @@
-# Amplify
+# Amplify - It's orbin' time!
 
-An [Amp](https://ampcode.com) plugin that makes Laravel apps run well on Amp, especially in
-[orbs](https://ampcode.com/docs/orbs), Amp's cloud sandboxes.
+Amplify helps your [AmpCode](https://ampcode.com) orbs run your Laravel apps well, with fewer setup quirks.
 
 Every new Laravel project on Amp needs the same setup: an orb setup script that installs PHP and
-dependencies, services and a portal that serve the app over HTTPS, Laravel Boost wired to Amp, the
-Laravel Cloud CLI, and a few global Composer tools. Amplify does that setup in one step.
+dependencies, services and a portal that serve the app over HTTPS, Laravel Boost wired to Amp, maybe the
+Laravel Cloud or Forge CLI, and a few global Composer tools. Amplify aims to make that setup as quick and easy as possible.
 
 ## Install
+
+#### For you
 
 Paste this into any Amp thread, or tell Puck:
 
@@ -20,8 +21,7 @@ loads in every new thread, on your machine and in orbs. Send the same message ag
 
 Then open a Laravel app in Amp and ask: **"Set up orbs for this app."**
 
-<details>
-<summary>For a whole team</summary>
+#### For a team workspace
 
 A workspace admin can install it for everyone in the workspace:
 
@@ -32,8 +32,6 @@ Add the Amplify plugin from https://github.com/springloadedco/amplify to our wor
 Amplify is a [directory plugin](https://ampcode.com/docs/customize/plugins): an `amplify/` folder
 with this repository's `index.ts`, `skills/`, and `LICENSE`. To keep it with one project instead,
 put that folder in the project's `.amp/plugins/`.
-
-</details>
 
 ## What it does
 
