@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { PluginAPI } from '@ampcode/plugin'
 
 export const description =
@@ -32,6 +33,10 @@ function isLaravelApp(root: string): boolean {
 	}
 }
 
+// Threads that were already open when the plugin was installed get this hook but not the skill,
+// so the note also gives the skill's file path for the agent to read directly.
+const SKILL_FILE = fileURLToPath(new URL('./skills/laravel-orb-setup/SKILL.md', import.meta.url))
+
 function laravelContext(root: string): string {
 	const lines = ['This repository is a Laravel app.']
 
@@ -39,7 +44,7 @@ function laravelContext(root: string): string {
 		// Covers repos with no orb setup and repos with a hand-written one, where agents otherwise
 		// fall back to a production build and hard-code the portal URL in .env.
 		lines.push(
-			'It does not have Amplify\'s orb setup yet. Before setting up orbs, running the app in a portal, or working around Vite, HMR, or http:// asset URLs behind a portal, load the amplify:laravel-orb-setup skill instead of the generic orb-setup skill. Do not replace the Vite dev server with `npm run build` or write a portal URL into .env.',
+			`It does not have Amplify's orb setup yet. Before setting up orbs, running the app in a portal, or working around Vite, HMR, or http:// asset URLs behind a portal, load the amplify:laravel-orb-setup skill instead of the generic orb-setup skill; if the skill tool does not list it, read ${SKILL_FILE} and follow it. Do not replace the Vite dev server with \`npm run build\`, write a portal URL into .env, or add trustProxies() to bootstrap/app.php for the portal: the skill makes portal requests count as HTTPS without changing app code.`,
 		)
 	} else {
 		lines.push(
@@ -47,8 +52,12 @@ function laravelContext(root: string): string {
 		)
 	}
 	if (existsSync(join(root, '.amp/settings.json')) && readFileSync(join(root, '.amp/settings.json'), 'utf8').includes('boost:mcp')) {
+		// A hand-written CLAUDE.md that imports Boost's output (skill step 5) is the source itself.
+		const claudeIsSource = existsSync(join(root, 'CLAUDE.md')) && readFileSync(join(root, 'CLAUDE.md'), 'utf8').includes('@.ai/boost.md')
 		lines.push(
-			'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. Its guidelines and skills have one source, .ai/guidelines and .ai/skills: edit those, then run `php artisan boost:update`. AGENTS.md, CLAUDE.md, and the skills folders under .agents, .claude, and other agent directories are generated copies; never edit or commit them.',
+			claudeIsSource
+				? 'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. CLAUDE.md is the hand-written source of agent guidelines: edit it directly. Boost writes its generated guidelines to .ai/boost.md, which CLAUDE.md imports; skills have one source, .ai/skills. After changing .ai/, run `php artisan boost:update`. .ai/boost.md, AGENTS.md, and the skills folders under .agents, .claude, and other agent directories are generated; never edit or commit them.'
+				: 'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. Its guidelines and skills have one source, .ai/guidelines and .ai/skills: edit those, then run `php artisan boost:update`. AGENTS.md, CLAUDE.md, and the skills folders under .agents, .claude, and other agent directories are generated copies; never edit or commit them.',
 		)
 	}
 

@@ -32,27 +32,50 @@ project needs, and keep those adjustments small so later Amplify updates are eas
 
 ## Steps
 
+Ask every setup question in this skill with the `ask_user_choice` option picker, never as
+freeform text in your reply: one call per question, with your recommended option first and marked
+"(recommended)", and `allowOther` on so the user can type something else. Gather what you need
+first, then ask questions that do not depend on each other in parallel, in the same response. If
+`ask_user_choice` is not available, ask in text with the same numbered options.
+
 1. Confirm this is a Laravel 11 or newer app: `artisan` exists, `composer.json` requires
    `laravel/framework`, and `php artisan --version` reports 11 or higher. Amplify relies on
    Laravel 11's `bootstrap/app.php` middleware configuration and `/up` health route. For older
    apps, stop and tell the user to upgrade first or use the generic orb setup.
 
-   Then choose the database with the user. Read `DB_CONNECTION` in `.env.example`,
-   `config/database.php`, CI workflows (`.github/workflows/*`, service containers and their
-   image versions), `docker-compose.yml` or Sail, and any existing `.agents/setup`. Present what
-   you found and ask the user which database and version orbs should run, with your best guess
-   first: SQLite, MySQL (8.4 or 8.0), MariaDB (a version or Debian's 10.11), or PostgreSQL
-   (13-18). Match production when you can tell what it runs. Never swap one engine for another
-   on your own, such as MariaDB for MySQL. Record the answer as the defaults near the top of
-   `.agents/setup`, e.g. `database=${AMPLIFY_DATABASE:-mysql}` and
+   Then choose the database with the user. Orbs should run what production runs. Read
+   `DB_CONNECTION` in `.env.example`, `config/database.php`, CI workflows (`.github/workflows/*`,
+   service containers and their image versions), `docker-compose.yml` or Sail, deploy config
+   (`cloud.yaml`, Forge or Vapor files), and any existing `.agents/setup`. Present what you found
+   and ask the user which database and version production uses, with your best guess first:
+   SQLite, MySQL (8.4 or 8.0), MariaDB (a version or Debian's 10.11), or PostgreSQL (13-18). Never
+   swap one engine for another on your own, such as MariaDB for MySQL. Record the answer as the
+   defaults near the top of `.agents/setup`, e.g. `database=${AMPLIFY_DATABASE:-mysql}` and
    `database_version=${AMPLIFY_DATABASE_VERSION:-8.4}`, so every orb uses it. Setup points the
    orb's `.env` at that local server.
+
+   Then check what the tests run on: `DB_CONNECTION` and `DB_DATABASE` in `phpunit.xml`, and
+   CI. If tests use a different engine than production, usually SQLite `:memory:` while
+   production runs MySQL or PostgreSQL, recommend running them on the production engine too:
+   SQLite accepts queries, column types, and constraints that MySQL and PostgreSQL reject, so
+   those bugs first show up in production. Setup already creates a `testing` database on the
+   local server, so the change is `DB_CONNECTION` set to the production engine and
+   `DB_DATABASE` set to `testing` in `phpunit.xml` (and the same in CI). Make it only if the user
+   agrees; mention that tests get somewhat slower.
+
+   Then ask whether every new orb should start from a fresh, seeded database. Recommend yes when
+   `database/seeders/DatabaseSeeder.php` creates users or data the app needs, and say which
+   (e.g. "creates test@example.com"). With yes, setup runs `php artisan migrate:fresh --seed`;
+   with no, only `php artisan migrate`. Record it as the default `fresh_seed=${AMPLIFY_FRESH_SEED:-1}`
+   (or `:-0`) near the top of `.agents/setup`. Seeding runs only in setup, so an orb that wakes
+   keeps its data; rerunning setup with `1` wipes the orb's local database. If the seeders fail
+   on a fresh database, fix or report that before recommending yes.
 
 2. Write `.agents/setup` from the template and `chmod +x` it. If the repository already has one,
    merge: keep project-specific steps the template lacks and replace the parts it covers.
    Pin PHP by writing a `.php-version` file only if `composer.json` requires a version older than
    8.4 or the project already uses one.
-   Keep the `database` and `database_version` values chosen in step 1.
+   Keep the `database`, `database_version`, and `fresh_seed` values chosen in step 1.
    Write `.agents/resume` from its template and `chmod +x` it. It starts the databases and sets
    the Forge CLI's organization and server.
 
@@ -118,6 +141,20 @@ project needs, and keep those adjustments small so later Amplify updates are eas
    - Untrack what is now ignored: review `git ls-files -ci --exclude-standard`, then run
      `git ls-files -ci --exclude-standard -z | xargs -0 -r git rm --cached -q`.
    - Check `git ls-files .agents .amp` lists the Amplify files you wrote and nothing generated.
+   - If the team keeps a hand-written `CLAUDE.md` as its source of truth (it is tracked and has
+     content outside the Boost block, or the user says so; ask when unsure), keep it instead of
+     moving it into `.ai/guidelines`. Boost cannot write around it: Amp reads `CLAUDE.md` only
+     when there is no `AGENTS.md`, and Boost would otherwise append its block into the committed
+     file. So send Boost's output to a gitignored file that `CLAUDE.md` imports:
+     - Remove the `<laravel-boost-guidelines>` block from `CLAUDE.md` and add a line
+       `@.ai/boost.md`, outside any code block. Move any tracked `AGENTS.md` content into
+       `CLAUDE.md`.
+     - In `config/boost.php` (create it with only this key if it does not exist; Boost merges
+       its defaults), set `'agents' => ['amp' => ['guidelines_path' => '.ai/boost.md'],
+       'claude_code' => ['guidelines_path' => '.ai/boost.md']]`, with a comment saying why.
+     - In `.gitignore`, drop `/CLAUDE.md` and add `/.ai/boost.md`. Keep `/AGENTS.md` ignored: a
+       local `AGENTS.md` would hide `CLAUDE.md` from Amp. If teammates use other agents that
+       write `AGENTS.md`, give them the same `guidelines_path` in `config/boost.php`.
 
 6. Run `.agents/setup` and fix every failure until it exits 0. Run it a second time to prove it
    is idempotent. The log is useful to the user: report the total time.
@@ -137,7 +174,8 @@ project needs, and keep those adjustments small so later Amplify updates are eas
    `laravel-boost` MCP server in `.amp/settings.json`. Verify:
    - `amp mcp list` shows `laravel-boost` under the workspace settings.
    - `AGENTS.md` contains the text of each `.ai/guidelines` file, and `.agents/skills/` has each
-     `.ai/skills` skill.
+     `.ai/skills` skill. With `CLAUDE.md` as the source (step 5), check `.ai/boost.md` instead,
+     that no `AGENTS.md` exists, and that `CLAUDE.md` is byte-for-byte unchanged after setup.
    - `git status` shows none of the generated files. The best proof is a fresh clone: clone the
      repository to a temporary directory, copy `.env`, run `.agents/setup` there, and check
      `git status --porcelain` is empty.

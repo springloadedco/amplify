@@ -9,35 +9,29 @@ Laravel Cloud CLI, and a few global Composer tools. Amplify does that setup in o
 
 ## Install
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/springloadedco/amplify/main/install.sh | bash
-```
-
-That adds Amplify to your Amp personal plugins, so it loads in every thread, on your machine and
-in orbs. Run the same line to update. It needs the [Amp CLI](https://ampcode.com/docs/cli),
-signed in, and git.
-
-No terminal? Paste this into any Amp thread, including one in an orb:
+Paste this into any Amp thread, or tell Puck:
 
 ```text
-Install the Amplify plugin from https://github.com/springloadedco/amplify by running its install.sh
+Add the Amplify plugin from https://github.com/springloadedco/amplify to my personal plugins, then push it
 ```
+
+Amp copies the plugin into your [personal plugins](https://ampcode.com/docs/customize/plugins), so it
+loads in every new thread, on your machine and in orbs. Send the same message again to update.
 
 Then open a Laravel app in Amp and ask: **"Set up orbs for this app."**
 
 <details>
-<summary>For a whole team, or without the script</summary>
+<summary>For a whole team</summary>
 
-Workspace admins can install it for everyone in the workspace:
+A workspace admin can install it for everyone in the workspace:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/springloadedco/amplify/main/install.sh | bash -s -- --workspace
+```text
+Add the Amplify plugin from https://github.com/springloadedco/amplify to our workspace plugins, then push it
 ```
 
-Amplify is a directory plugin, so you can also put this repository's `index.ts` and `skills/` in an
-`amplify/` folder yourself: in your plugins repository (`amp clone user-plugins`, then commit and
-push), in `~/.config/amp/plugins/amplify` for one machine (not orbs), or in `.amp/plugins/amplify`
-for one project.
+Amplify is a [directory plugin](https://ampcode.com/docs/customize/plugins): an `amplify/` folder
+with this repository's `index.ts`, `skills/`, and `LICENSE`. To keep it with one project instead,
+put that folder in the project's `.amp/plugins/`.
 
 </details>
 
@@ -69,7 +63,10 @@ for one project.
   (`AGENTS.md`, `CLAUDE.md`, `.agents/skills`, `.claude/skills`, MCP config, `boost.json`) are
   gitignored, as in Laravel's starter kits, and `.agents/setup` regenerates them for Amp with
   `boost:install` in every orb. Existing repositories have their hand-written content moved into
-  `.ai/` and the generated copies untracked.
+  `.ai/` and the generated copies untracked. Teams that keep a hand-written `CLAUDE.md` keep it:
+  Boost's output goes to a gitignored `.ai/boost.md` that `CLAUDE.md` imports.
+- asks what database production runs, sets orbs up with the same one, and recommends running the
+  tests on it too instead of SQLite.
 
 **Laravel context in every thread.** On a thread's first prompt in a Laravel repository, Amplify
 tells the agent how to start the app's services, to use Boost's MCP tools, and, when the repository
@@ -87,9 +84,11 @@ Vars):
 | `AMPLIFY_COMPOSER_GLOBAL_PACKAGES` | `laravel/installer laravel/cloud-cli laravel/forge-cli` | Global Composer packages; empty to skip |
 | `AMPLIFY_DATABASE` | chosen during setup, else `DB_CONNECTION` | `sqlite`, `mysql`, `mariadb`, or `pgsql` |
 | `AMPLIFY_DATABASE_VERSION` | chosen during setup, else MySQL 8.4 / PostgreSQL 17 / MariaDB 10.11 | Database server version |
+| `AMPLIFY_FRESH_SEED` | chosen during setup, else `1` | `1` runs `migrate:fresh --seed` in setup, `0` only `migrate` |
 
-The skill asks which database the app runs on (MySQL, MariaDB, PostgreSQL, or SQLite, and which
-version) the first time it sets a project up, and records the answer in `.agents/setup`. Local
+The first time it sets a project up, the skill asks, with Amp's option picker, which database
+production runs (MySQL, MariaDB, PostgreSQL, or SQLite, and which version) and whether new orbs
+should start from a freshly seeded database, and records both answers in `.agents/setup`. Local
 service ports live in `.amp/orb.env`; change one there if it clashes with something the app
 already runs.
 

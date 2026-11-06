@@ -12,6 +12,7 @@
 #   AMPLIFY_COMPOSER_GLOBAL_PACKAGES global Composer packages (default: laravel/installer laravel/cloud-cli laravel/forge-cli)
 #   AMPLIFY_DATABASE                 sqlite, mysql, mariadb, or pgsql (default: below)
 #   AMPLIFY_DATABASE_VERSION         e.g. 8.4 for MySQL, 17 for PostgreSQL (default: below)
+#   AMPLIFY_FRESH_SEED               1 to run migrate:fresh --seed, 0 to only migrate (default: below)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -21,6 +22,11 @@ cd "$(dirname "$0")/.."
 # empty means MySQL 8.4, PostgreSQL 17, or Debian's MariaDB 10.11.
 database=${AMPLIFY_DATABASE:-}
 database_version=${AMPLIFY_DATABASE_VERSION:-}
+
+# 1: every new orb starts from a fresh, seeded database (migrate:fresh --seed), so the app has the
+# seeders' users and data. 0: only run pending migrations. Rerunning setup with 1 wipes the
+# orb's local database.
+fresh_seed=${AMPLIFY_FRESH_SEED:-1}
 
 log() { printf '\n\033[1;35m[amplify]\033[0m %s\n' "$*"; }
 
@@ -257,8 +263,13 @@ fi
 
 # --- Application -------------------------------------------------------------------------------
 
-log "Running migrations"
-php artisan migrate --force --no-interaction
+if [ "$fresh_seed" = 1 ]; then
+	log "Rebuilding and seeding the database"
+	php artisan migrate:fresh --seed --force --no-interaction
+else
+	log "Running migrations"
+	php artisan migrate --force --no-interaction
+fi
 
 # --- Laravel Boost ------------------------------------------------------------------------------
 # Boost's output (AGENTS.md, CLAUDE.md, every agent's skills folder, MCP config) is generated and
