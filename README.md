@@ -3,8 +3,10 @@
 Amplify helps your [AmpCode](https://ampcode.com) orbs run your Laravel apps well, with fewer setup quirks.
 
 Every new Laravel project on Amp needs the same setup: an orb setup script that installs PHP and
-dependencies, services and a portal that serve the app over HTTPS, Laravel Boost wired to Amp, maybe the
-Laravel Cloud or Forge CLI, and a few global Composer tools. Amplify aims to make that setup as quick and easy as possible.
+dependencies, services and a portal that serve the app over HTTPS, Laravel Boost wired to Amp,
+Laravel Cloud and Forge CLI's, and a few global Composer tools. 
+
+Amplify removes a few paper cuts that you'll normally run into when getting Laravel running on your orb.
 
 ## Install
 
