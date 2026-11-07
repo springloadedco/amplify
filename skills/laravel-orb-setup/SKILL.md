@@ -25,8 +25,9 @@ project needs, and keep those adjustments small so later Amplify updates are eas
   settings every service loads. Ports are set only here.
 - [templates/orb-proxy.mjs](templates/orb-proxy.mjs) — `.amp/orb-proxy.mjs`, the same-origin
   proxy behind the `web` portal.
-- [templates/gitignore](templates/gitignore) — entries that commit Amplify's files and ignore
-  Laravel Boost's generated output.
+- [templates/gitignore](templates/gitignore) — entries that commit Amplify's files.
+- [boost-single-source.md](boost-single-source.md) — instructions for the optional follow-up
+  thread that makes `.ai/` the single source of Boost's guidelines and skills.
 - [templates/vite.config.mjs](templates/vite.config.mjs) — `.amp/vite.config.mjs`, which runs the
   app's own `vite.config.js` behind the portal with HMR.
 
@@ -37,6 +38,18 @@ freeform text in your reply: one call per question, with your recommended option
 "(recommended)", and `allowOther` on so the user can type something else. Gather what you need
 first, then ask questions that do not depend on each other in parallel, in the same response. If
 `ask_user_choice` is not available, ask in text with the same numbered options.
+
+## Changes to the app
+
+Orb setup writes only Amplify's own files: `.agents/setup`, `.agents/resume`, `.amp/`, and the
+Amplify entries in `.gitignore`. It never changes the application: no `composer require` or
+upgrades, and no edits to `bootstrap/`, `config/`, `phpunit.xml`, `AGENTS.md`, `CLAUDE.md`, or
+committed skills. When the steps below find an app change worth making, ask about it with the
+picker (recommended option first, "Not now" last). After setup works, start one new thread with
+`create_thread` that makes all the approved changes, so they land as their own reviewable
+change; tell it the repository, the branch, and what each change is for, and point it at
+[boost-single-source.md](boost-single-source.md) when that one is approved. Link the thread in
+your report.
 
 1. Confirm this is a Laravel 11 or newer app: `artisan` exists, `composer.json` requires
    `laravel/framework`, and `php artisan --version` reports 11 or higher. Amplify relies on
@@ -60,8 +73,8 @@ first, then ask questions that do not depend on each other in parallel, in the s
    SQLite accepts queries, column types, and constraints that MySQL and PostgreSQL reject, so
    those bugs first show up in production. Setup already creates a `testing` database on the
    local server, so the change is `DB_CONNECTION` set to the production engine and
-   `DB_DATABASE` set to `testing` in `phpunit.xml` (and the same in CI). Make it only if the user
-   agrees; mention that tests get somewhat slower.
+   `DB_DATABASE` set to `testing` in `phpunit.xml` (and the same in CI). That is an app change
+   for the follow-up thread (see Changes to the app); mention that tests get somewhat slower.
 
    Then ask whether every new orb should start from a fresh, seeded database. Recommend yes when
    `database/seeders/DatabaseSeeder.php` creates users or data the app needs, and say which
@@ -73,11 +86,15 @@ first, then ask questions that do not depend on each other in parallel, in the s
 
 2. Write `.agents/setup` from the template and `chmod +x` it. If the repository already has one,
    merge: keep project-specific steps the template lacks and replace the parts it covers.
-   Pin PHP by writing a `.php-version` file only if `composer.json` requires a version older than
-   8.4 or the project already uses one.
+   Setup picks PHP from Composer: `config.platform.php` if set, otherwise the newest version
+   that `composer.json` and every package in `composer.lock` allow. Do not add a `.php-version`.
    Keep the `database`, `database_version`, and `fresh_seed` values chosen in step 1.
    Write `.agents/resume` from its template and `chmod +x` it. It starts the databases and sets
    the Forge CLI's organization and server.
+   Merge [templates/gitignore](templates/gitignore) into `.gitignore`. Replace directory entries
+   such as `/.agents` or `/.amp` (the starter kits have them) with the template's `/*` form;
+   otherwise Git ignores `.agents/setup` and the other Amplify files. Check
+   `git ls-files .agents .amp` lists the Amplify files once they are committed.
 
 3. Copy `orb.env`, `orb-proxy.mjs`, `vite.config.mjs`, and `php/` into `.amp/`. Do not edit the app's
    `vite.config.js`; see How the portal works below. Write `.amp/services.yaml` from the
@@ -120,41 +137,29 @@ first, then ask questions that do not depend on each other in parallel, in the s
    inside the `app` service only, so Laravel generates `https://` URLs and validates signed URLs
    with no change to the app's code. Do not add `trustProxies()` to `bootstrap/app.php` or a
    `TRUSTED_PROXIES` entry to `.env.example` for the portal. If an earlier setup added
-   `$middleware->trustProxies(at: env('TRUSTED_PROXIES'))` only for Amp, remove it and the
-   `TRUSTED_PROXIES` lines; keep any `trustProxies` call the app has for production.
+   `$middleware->trustProxies(at: env('TRUSTED_PROXIES'))` only for Amp, offer its removal (and
+   the `TRUSTED_PROXIES` lines) for the follow-up thread; any `trustProxies` call the app has for
+   production stays.
 
-5. Make `.ai/` the single source of truth for agent guidelines and skills. Boost copies every
-   guideline and skill into each agent's own files (`AGENTS.md`, `CLAUDE.md`, `.agents/skills`,
-   `.claude/skills`, `.cursor/skills`, ...), so committing that output duplicates every skill
-   per agent. Setup regenerates it with `boost:install` instead, as Laravel's starter kits
-   intend: they gitignore all of it, including `boost.json`, the per-developer agent list.
-   - If `laravel/boost` is not in `composer.json`, run `composer require laravel/boost --dev`.
-   - Move hand-written content out of generated files before untracking them. Text in
-     `AGENTS.md` or `CLAUDE.md` outside the `<laravel-boost-guidelines>` block goes to
-     `.ai/guidelines/<topic>.md`. A tracked skill folder in any agent's skills directory that
-     Boost does not generate (not in `boost.json`'s `skills` and not from a Composer package)
-     moves to `.ai/skills/<name>/`. Keep `.ai/rules/`; Boost's `record-rule` tool writes the
-     team's rules there, except the generated `.ai/rules/boost/`.
-   - Merge [templates/gitignore](templates/gitignore) into `.gitignore`. Replace directory
-     entries such as `/.agents` or `/.amp` (the starter kits have them) with the template's
-     `/*` form; otherwise Git ignores `.agents/setup` and the other Amplify files.
-   - Untrack what is now ignored: review `git ls-files -ci --exclude-standard`, then run
-     `git ls-files -ci --exclude-standard -z | xargs -0 -r git rm --cached -q`.
-   - Check `git ls-files .agents .amp` lists the Amplify files you wrote and nothing generated.
-   - If the team keeps a hand-written `CLAUDE.md` as its source of truth (it is tracked and has
-     content outside the Boost block, or the user says so; ask when unsure), keep it instead of
-     moving it into `.ai/guidelines`. Boost cannot write around it: Amp reads `CLAUDE.md` only
-     when there is no `AGENTS.md`, and Boost would otherwise append its block into the committed
-     file. So send Boost's output to a gitignored file that `CLAUDE.md` imports:
-     - Remove the `<laravel-boost-guidelines>` block from `CLAUDE.md` and add a line
-       `@.ai/boost.md`, outside any code block. Move any tracked `AGENTS.md` content into
-       `CLAUDE.md`.
-     - In `config/boost.php` (create it with only this key if it does not exist; Boost merges
-       its defaults), set `'agents' => ['amp' => ['guidelines_path' => '.ai/boost.md'],
-       'claude_code' => ['guidelines_path' => '.ai/boost.md']]`, with a comment saying why.
-     - In `.gitignore`, drop `/CLAUDE.md` and add `/.ai/boost.md`. Keep `/AGENTS.md` ignored: a
-       local `AGENTS.md` would hide `CLAUDE.md` from Amp. If teammates use other agents that
-       write `AGENTS.md`, give them the same `guidelines_path` in `config/boost.php`.
+5. Laravel Boost. Read the installed version from `composer.lock` and the latest from
+   `composer outdated laravel/boost --direct --format=json` (or
+   `https://repo.packagist.org/p2/laravel/boost.json`). Then ask, each with the picker:
+   - If Boost is missing or older than the latest release: "Boost is <installed>, the latest is
+     <latest>. Upgrade it in a separate thread?" Upgrading means `composer require laravel/boost
+     --dev` (or `composer update laravel/boost -W`), `php artisan boost:update`, and the test
+     suite, all in the follow-up thread.
+   - If the repository commits Boost's generated files (`git ls-files` on the paths from
+     [Boost's output paths](boost-single-source.md#boosts-output-paths)), say how many duplicate skill and
+     guideline copies that is, and ask whether the follow-up thread should make `.ai/` their
+     single source ([boost-single-source.md](boost-single-source.md)). It also covers teams that
+     keep a hand-written `CLAUDE.md`.
+   - "Run `boost:install` in every orb?" With yes, setup adds `amp` to `boost.json` and runs
+     `php artisan boost:install --no-interaction`, so each orb has Boost's guidelines, skills,
+     and MCP server for Amp. Recommend yes when Boost's generated files are gitignored, as in
+     the starter kits. When they are committed, recommend no unless the single-source change is
+     also approved, because regenerating them changes committed files in every orb. Record the
+     answer as `boost_install=${AMPLIFY_BOOST_INSTALL:-1}` (or `:-0`) near the top of
+     `.agents/setup`.
 
 6. Run `.agents/setup` and fix every failure until it exits 0. Run it a second time to prove it
    is idempotent. The log is useful to the user: report the total time.
@@ -168,17 +173,11 @@ first, then ask questions that do not depend on each other in parallel, in the s
    Inertia app with SSR enabled, check the HTML from `curl <portal>/` contains
    `data-server-rendered="true"`.
 
-8. Check Laravel Boost. Setup adds `amp` to `boost.json` and runs
-   `php artisan boost:install --no-interaction`, which writes `AGENTS.md` (with
-   `.ai/guidelines` merged in), `.agents/skills/` (with `.ai/skills` copied in), and the
-   `laravel-boost` MCP server in `.amp/settings.json`. Verify:
-   - `amp mcp list` shows `laravel-boost` under the workspace settings.
-   - `AGENTS.md` contains the text of each `.ai/guidelines` file, and `.agents/skills/` has each
-     `.ai/skills` skill. With `CLAUDE.md` as the source (step 5), check `.ai/boost.md` instead,
-     that no `AGENTS.md` exists, and that `CLAUDE.md` is byte-for-byte unchanged after setup.
-   - `git status` shows none of the generated files. The best proof is a fresh clone: clone the
-     repository to a temporary directory, copy `.env`, run `.agents/setup` there, and check
-     `git status --porcelain` is empty.
+8. Check that setup changed nothing in the app: in a fresh clone (clone the repository to a
+   temporary directory, copy `.env` and the new Amplify files, run `.agents/setup` there),
+   `git status --porcelain` lists only the Amplify files. With `boost_install=1`, also check
+   `amp mcp list` shows `laravel-boost` under the workspace settings and `AGENTS.md` contains
+   the text of each `.ai/guidelines` file.
 
 9. Laravel Cloud and Forge CLIs: setup installs `cloud` and `forge` globally. Both read their
    API token from the environment, so ask the user which they deploy with and tell them which
@@ -230,7 +229,6 @@ Tell the user what changed and what remains:
   the `AMPLIFY_COMPOSER_GLOBAL_PACKAGES` project environment variable, PHP with
   `AMPLIFY_PHP_VERSION`, and add PHP extensions with `AMPLIFY_PHP_EXTENSIONS`.
 - Mail sent from the `web` and `queue` services goes to Mailpit; its portal is in the Portal tab.
-- Agent guidelines and skills live in `.ai/`; never edit or commit the generated copies.
-  Locally, developers run `php artisan boost:install` once to pick their own agents and
-  `php artisan boost:update` after changing `.ai/`.
+- Which app changes you offered, which were approved, and the link to the follow-up thread
+  making them. Setup itself changed only Amplify's files.
 - Show the portal screenshot.

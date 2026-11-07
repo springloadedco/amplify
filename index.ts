@@ -52,12 +52,12 @@ function laravelContext(root: string): string {
 		)
 	}
 	if (existsSync(join(root, '.amp/settings.json')) && readFileSync(join(root, '.amp/settings.json'), 'utf8').includes('boost:mcp')) {
-		// A hand-written CLAUDE.md that imports Boost's output (skill step 5) is the source itself.
+		// A hand-written CLAUDE.md that imports Boost's output (boost-single-source.md) is the source itself.
 		const claudeIsSource = existsSync(join(root, 'CLAUDE.md')) && readFileSync(join(root, 'CLAUDE.md'), 'utf8').includes('@.ai/boost.md')
 		lines.push(
 			claudeIsSource
 				? 'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. CLAUDE.md is the hand-written source of agent guidelines: edit it directly. Boost writes its generated guidelines to .ai/boost.md, which CLAUDE.md imports; skills have one source, .ai/skills. After changing .ai/, run `php artisan boost:update`. .ai/boost.md, AGENTS.md, and the skills folders under .agents, .claude, and other agent directories are generated; never edit or commit them.'
-				: 'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. Its guidelines and skills have one source, .ai/guidelines and .ai/skills: edit those, then run `php artisan boost:update`. AGENTS.md, CLAUDE.md, and the skills folders under .agents, .claude, and other agent directories are generated copies; never edit or commit them.',
+				: 'Laravel Boost is installed: prefer its MCP tools (search-docs, database-schema, database-query, read-log-entries, last-error) over guessing. Boost generates the <laravel-boost-guidelines> block in AGENTS.md and CLAUDE.md and the skills it installs into .agents, .claude, and other agent directories, from .ai/guidelines, .ai/skills, and installed packages: change those sources and run `php artisan boost:update` instead of editing the generated copies.',
 		)
 	}
 

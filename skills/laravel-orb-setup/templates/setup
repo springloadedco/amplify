@@ -7,12 +7,13 @@
 # .amp/services.yaml, not here.
 #
 # Override with project environment variables in Amp settings:
-#   AMPLIFY_PHP_VERSION              PHP version to install, e.g. 8.3 (default: from .php-version, else 8.4)
+#   AMPLIFY_PHP_VERSION              PHP version to install, e.g. 8.3 (default: the newest composer.json and composer.lock allow)
 #   AMPLIFY_PHP_EXTENSIONS           extra apt PHP extensions, e.g. "imagick swoole"
 #   AMPLIFY_COMPOSER_GLOBAL_PACKAGES global Composer packages (default: laravel/installer laravel/cloud-cli laravel/forge-cli)
 #   AMPLIFY_DATABASE                 sqlite, mysql, mariadb, or pgsql (default: below)
 #   AMPLIFY_DATABASE_VERSION         e.g. 8.4 for MySQL, 17 for PostgreSQL (default: below)
 #   AMPLIFY_FRESH_SEED               1 to run migrate:fresh --seed, 0 to only migrate (default: below)
+#   AMPLIFY_BOOST_INSTALL            1 to run boost:install for Amp, 0 to skip (default: below)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -27,6 +28,10 @@ database_version=${AMPLIFY_DATABASE_VERSION:-}
 # seeders' users and data. 0: only run pending migrations. Rerunning setup with 1 wipes the
 # orb's local database.
 fresh_seed=${AMPLIFY_FRESH_SEED:-1}
+
+# 1: run `php artisan boost:install` for Amp, so the orb has Boost's guidelines, skills, and MCP
+# server. It writes Boost's generated files; skip it if the repository commits them.
+boost_install=${AMPLIFY_BOOST_INSTALL:-1}
 
 log() { printf '\n\033[1;35m[amplify]\033[0m %s\n' "$*"; }
 
@@ -62,9 +67,61 @@ apt_install() {
 
 # --- PHP ---------------------------------------------------------------------------------------
 
-php_version=${AMPLIFY_PHP_VERSION:-}
-if [ -z "$php_version" ] && [ -f .php-version ]; then
-	php_version=$(grep -oE '^[0-9]+\.[0-9]+' .php-version || true)
+semver_num() { # semver_num 8.2.5 -> 80205
+	local a b c
+	IFS=. read -r a b c <<<"$1"
+	echo $((${a:-0} * 10000 + ${b:-0} * 100 + ${c:-0}))
+}
+
+php_satisfies() { # php_satisfies 8.4 '^8.2 || ^9.0' — can some 8.4.x release satisfy the Composer constraint?
+	local cand_lo cand_hi alt term op v a b c lo hi ok terms
+	cand_lo=$(semver_num "$1.0")
+	cand_hi=$(semver_num "$1.99")
+	while read -r alt; do
+		ok=1
+		read -ra terms <<<"$(sed -E 's/([0-9][0-9.]*) +- +([0-9][0-9.]*)/>=\1 <=\2/g; s/@[a-z]+//g; s/,/ /g; s/(>=|<=|!=|>|<|=|\^|~) +/\1/g' <<<"$alt")"
+		for term in "${terms[@]}"; do
+			op=$(grep -oE '^(>=|<=|!=|>|<|=|\^|~)' <<<"$term" || true)
+			v=${term#"$op"}
+			v=${v#v}
+			v=${v%.\*}
+			[ "$v" = '*' ] || [ "$op" = '!=' ] && continue
+			IFS=. read -r a b c <<<"$v"
+			lo=$(semver_num "$v")
+			case $op in
+			'^') hi=$(((a + 1) * 10000)) ;;
+			'~') if [ -n "$c" ]; then hi=$((a * 10000 + (b + 1) * 100)); else hi=$(((a + 1) * 10000)); fi ;;
+			'>=') hi=999999 ;;
+			'>') lo=$((lo + 1)) hi=999999 ;;
+			'<=') hi=$((lo + 1)) lo=0 ;;
+			'<') hi=$lo lo=0 ;;
+			*) # exact or wildcard: 8, 8.2, 8.2.*, 8.2.5
+				if [ -n "$c" ]; then hi=$((lo + 1)); elif [ -n "$b" ]; then hi=$((a * 10000 + (b + 1) * 100)); else hi=$(((a + 1) * 10000)); fi ;;
+			esac
+			[ "$cand_hi" -ge "$lo" ] && [ "$cand_lo" -lt "$hi" ] || ok=0
+		done
+		[ "$ok" = 1 ] && return 0
+	done < <(sed 's/||*/\n/g' <<<"$2")
+	return 1
+}
+
+# PHP comes from Composer. config.platform.php pins it exactly, because Composer resolves the lock
+# file against it. Otherwise use the newest PHP that composer.json's require.php and every locked
+# package's PHP requirement allow.
+apt_install jq
+php_version=${AMPLIFY_PHP_VERSION:-$(jq -r '.config.platform.php // empty' composer.json | grep -oE '^[0-9]+\.[0-9]+' || true)}
+if [ -z "$php_version" ]; then
+	mapfile -t php_constraints < <(
+		jq -r '.require.php // empty' composer.json
+		[ ! -f composer.lock ] || jq -r '(.packages + (.["packages-dev"] // []))[] | .require.php // empty' composer.lock | sort -u
+	)
+	for candidate in 8.5 8.4 8.3 8.2; do
+		fits=1
+		for constraint in "${php_constraints[@]}"; do
+			php_satisfies "$candidate" "$constraint" || { fits=0 && break; }
+		done
+		[ "$fits" = 1 ] && php_version=$candidate && break
+	done
 fi
 php_version=${php_version:-8.4}
 
@@ -272,11 +329,10 @@ else
 fi
 
 # --- Laravel Boost ------------------------------------------------------------------------------
-# Boost's output (AGENTS.md, CLAUDE.md, every agent's skills folder, MCP config) is generated and
-# gitignored. It is rebuilt here from the team's committed .ai/guidelines and .ai/skills, so the
-# repository keeps one copy of each guideline and skill.
+# Boost generates AGENTS.md, skills folders, and the MCP config from .ai/ and installed packages.
+# Setup never adds or upgrades Boost itself; that is an app change.
 
-if [ -f vendor/laravel/boost/composer.json ]; then
+if [ "$boost_install" = 1 ] && [ -f vendor/laravel/boost/composer.json ]; then
 	log "Generating Laravel Boost guidelines, skills, and MCP config"
 	[ -s boost.json ] || echo '{}' >boost.json
 	if ! jq -e '(.agents // []) | index("amp")' boost.json >/dev/null; then

@@ -70,15 +70,14 @@ put that folder in the project's `.amp/plugins/`.
 - makes Laravel generate `https://` URLs behind the portal without touching the app's code: a
   PHP prepend file loaded only by the orb's `app` service marks portal requests as HTTPS, so no
   `trustProxies()` change to `bootstrap/app.php` is needed.
-- keeps [Laravel Boost](https://github.com/laravel/boost) to a single source of truth. Team
-  guidelines and skills live in `.ai/guidelines` and `.ai/skills`; Boost's per-agent copies
-  (`AGENTS.md`, `CLAUDE.md`, `.agents/skills`, `.claude/skills`, MCP config, `boost.json`) are
-  gitignored, as in Laravel's starter kits, and `.agents/setup` regenerates them for Amp with
-  `boost:install` in every orb. Existing repositories have their hand-written content moved into
-  `.ai/` and the generated copies untracked. Teams that keep a hand-written `CLAUDE.md` keep it:
-  Boost's output goes to a gitignored `.ai/boost.md` that `CLAUDE.md` imports.
-- asks what database production runs, sets orbs up with the same one, and recommends running the
-  tests on it too instead of SQLite.
+- wires [Laravel Boost](https://github.com/laravel/boost) to Amp: if you choose, every orb runs
+  `boost:install` so Boost's guidelines, skills, and MCP server are ready.
+- asks what database production runs and sets orbs up with the same one.
+- never changes your app. Setup writes only `.agents/`, `.amp/`, and Amplify's `.gitignore`
+  entries. Changes it recommends, such as upgrading Boost, making `.ai/` the single source of
+  Boost's guidelines and skills instead of committing a copy per agent, or running tests on the
+  production database instead of SQLite, are offered one by one and made in a separate thread
+  you review.
 
 **Laravel context in every thread.** On a thread's first prompt in a Laravel repository, Amplify
 tells the agent how to start the app's services, to use Boost's MCP tools, and, when the repository
@@ -91,23 +90,24 @@ Vars):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AMPLIFY_PHP_VERSION` | `.php-version`, else `8.4` | PHP version to install |
+| `AMPLIFY_PHP_VERSION` | `config.platform.php`, else the newest PHP that `composer.json` and `composer.lock` allow | PHP version to install |
 | `AMPLIFY_PHP_EXTENSIONS` | none | Extra `php<version>-*` packages, e.g. `imagick swoole` |
 | `AMPLIFY_COMPOSER_GLOBAL_PACKAGES` | `laravel/installer laravel/cloud-cli laravel/forge-cli` | Global Composer packages; empty to skip |
 | `AMPLIFY_DATABASE` | chosen during setup, else `DB_CONNECTION` | `sqlite`, `mysql`, `mariadb`, or `pgsql` |
 | `AMPLIFY_DATABASE_VERSION` | chosen during setup, else MySQL 8.4 / PostgreSQL 17 / MariaDB 10.11 | Database server version |
 | `AMPLIFY_FRESH_SEED` | chosen during setup, else `1` | `1` runs `migrate:fresh --seed` in setup, `0` only `migrate` |
+| `AMPLIFY_BOOST_INSTALL` | chosen during setup, else `1` | `1` runs `boost:install` for Amp in setup, `0` skips it |
 
 The first time it sets a project up, the skill asks, with Amp's option picker, which database
-production runs (MySQL, MariaDB, PostgreSQL, or SQLite, and which version) and whether new orbs
-should start from a freshly seeded database, and records both answers in `.agents/setup`. Local
+production runs (MySQL, MariaDB, PostgreSQL, or SQLite, and which version), whether new orbs
+should start from a freshly seeded database, and whether they run `boost:install`, and records
+the answers in `.agents/setup`. Local
 service ports live in `.amp/orb.env`; change one there if it clashes with something the app
 already runs.
 
 Amplify supports Laravel 11 and newer. In a repository that already runs in Amp, the skill merges
 its files with the existing `.agents/setup` and `.amp/services.yaml` instead of replacing them.
-After the change lands, teammates run `php artisan boost:install` once in their local checkout,
-because Boost's generated files are no longer committed. Threads whose orbs started before the
+Threads whose orbs started before the
 change keep their old environment; start a new thread to pick it up.
 
 The Laravel Cloud CLI authenticates from `LARAVEL_CLOUD_TOKEN`. Store a
