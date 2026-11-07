@@ -8,6 +8,18 @@ Laravel Cloud and Forge CLI's, and a few global Composer tools.
 
 Amplify removes a few paper cuts that you'll normally run into when getting Laravel running on your orb.
 
+## What you get
+
+- **One prompt to set up an orb.** Ask Amp to "Set up orbs for this app" and it writes `.agents/setup`, `.agents/resume`, and `.amp/services.yaml` for you.
+- **An orb that's ready to work.** It installs PHP, Composer, and your dependencies, creates `.env` and `APP_KEY`, and runs your migrations and seeders.
+- **The database you use in production.** SQLite, MySQL, MariaDB, or PostgreSQL at the version you pick, plus Redis if your app uses it.
+- **`composer run dev`, in the orb.** You get the app, Vite with hot reload, a queue worker, Reverb, and Mailpit to catch outgoing mail.
+- **One HTTPS portal that works.** The app, hot reload, and Reverb all run on one portal URL with correct `https://` links, and you don't have to change your app's code.
+- **Laravel Boost and the Cloud and Forge CLIs set up for Amp.** Boost reads your guidelines from `.ai/`, and the CLIs sign in with your Amp secrets.
+- **Laravel context in every thread.** Amp knows how to start your services and use Boost's tools from your first prompt.
+
+Works with Laravel 11 and later. If you already have setup files, it adds to them instead of replacing them.
+
 ## Install
 
 #### For you
